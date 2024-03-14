@@ -45,6 +45,11 @@ export async function handleThanksEvent (event: CommentSubmit | CommentUpdate, c
         return;
     }
 
+    if (event.author.id === context.appAccountId || event.author.name === "AutoModerator") {
+        // Prevent bot account or Automod granting points
+        return;
+    }
+
     const [userCommand, modCommand] = await Promise.all([
         context.settings.get<string>(SettingName.ThanksCommand),
         context.settings.get<string>(SettingName.ModThanksCommand),
@@ -61,25 +66,32 @@ export async function handleThanksEvent (event: CommentSubmit | CommentUpdate, c
     const isMod = await isModerator(context, event.subreddit.name, event.author.name);
 
     if (userCommand && event.comment.body.toLowerCase().includes(userCommand.toLowerCase()) && event.author.id !== event.post.authorId) {
-        if (!isMod) {
-            const anyoneCanAwardPoints = await context.settings.get<boolean>(SettingName.AnyoneCanAwardPoints);
-            if (!anyoneCanAwardPoints) {
-                console.log(`${event.comment.id}: points attempt made by ${event.author.name} who is not the OP`);
-                const superUserSetting = await context.settings.get<string>(SettingName.SuperUsers);
-                if (!superUserSetting) {
-                    return;
-                }
+        const anyoneCanAwardPoints = await context.settings.get<boolean>(SettingName.AnyoneCanAwardPoints);
+        if (!anyoneCanAwardPoints) {
+            console.log(`${event.comment.id}: points attempt made by ${event.author.name} who is not the OP`);
+            const superUserSetting = await context.settings.get<string>(SettingName.SuperUsers);
+            if (!superUserSetting) {
+                return;
+            }
 
-                const superUsers = superUserSetting.split(",").map(user => user.trim().toLowerCase());
-                if (!superUsers.includes(event.author.name.toLowerCase())) {
-                    console.log(`${event.comment.id}: Additionally, user is not a superuser`);
-                    return;
-                }
+            const superUsers = superUserSetting.split(",").map(user => user.trim().toLowerCase());
+            if (!superUsers.includes(event.author.name.toLowerCase())) {
+                console.log(`${event.comment.id}: Additionally, user is not a superuser`);
+                return;
             }
         }
     } else if (modCommand && event.comment.body.toLowerCase().includes(modCommand.toLowerCase())) {
         if (!isMod) {
             console.log(`${event.comment.id}: mod points attempt by non-mod ${event.author.name}`);
+            return;
+        }
+    }
+
+    const usersWhoCantAwardPointsSetting = await context.settings.get<string>(SettingName.UsersWhoCannotAwardPoints);
+    if (usersWhoCantAwardPointsSetting) {
+        const usersWhoCantAwardPoints = usersWhoCantAwardPointsSetting.split(",").map(user => user.trim().toLowerCase());
+        if (usersWhoCantAwardPoints.includes(event.author.name.toLowerCase())) {
+            console.log(`${event.comment.id}: ${event.author.name} is not permitted to award points.`);
             return;
         }
     }
@@ -99,7 +111,7 @@ export async function handleThanksEvent (event: CommentSubmit | CommentUpdate, c
         }
         return;
     } else {
-        const excludedUsersSetting = await context.settings.get<string>(SettingName.ExcludedUsers);
+        const excludedUsersSetting = await context.settings.get<string>(SettingName.UsersWhoCannotBeAwardedPoints);
         if (excludedUsersSetting) {
             const excludedUsers = excludedUsersSetting.split(",").map(userName => userName.trim().toLowerCase());
             if (excludedUsers.includes(parentComment.authorName.toLowerCase())) {
