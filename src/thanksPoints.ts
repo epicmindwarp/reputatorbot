@@ -69,20 +69,15 @@ export async function handleThanksEvent (event: CommentSubmit | CommentUpdate, c
         const anyoneCanAwardPoints = settings[SettingName.AnyoneCanAwardPoints] as boolean ?? false;
         if (!anyoneCanAwardPoints) {
             console.log(`${event.comment.id}: points attempt made by ${event.author.name} who is not the OP`);
-            const superUserSetting = settings[SettingName.SuperUsers] as string ?? "";
-            if (!superUserSetting) {
-                return;
-            }
-
-            const superUsers = superUserSetting.split(",").map(user => user.trim().toLowerCase());
-            if (!superUsers.includes(event.author.name.toLowerCase())) {
-                console.log(`${event.comment.id}: Additionally, user is not a superuser`);
-                return;
-            }
+            return;
         }
     } else if (modCommand && event.comment.body.toLowerCase().includes(modCommand.toLowerCase())) {
-        if (!isMod) {
-            console.log(`${event.comment.id}: mod points attempt by non-mod ${event.author.name}`);
+        const superUserSetting = settings[SettingName.SuperUsers] as string ?? "";
+        const superUsers = superUserSetting.split(",").map(user => user.trim().toLowerCase());
+        const userIsSuperuser = superUsers.includes(event.author.name.toLowerCase());
+
+        if (!isMod && !userIsSuperuser) {
+            console.log(`${event.comment.id}: mod points attempt by ${event.author.name} who is neither a mod nor a superuser`);
             return;
         }
     }

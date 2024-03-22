@@ -77,7 +77,7 @@ export const appSettings: SettingsFormField[] = [
             {
                 name: SettingName.ModThanksCommand,
                 type: "string",
-                label: "Alternate command for mods to award reputation points",
+                label: "Alternate command for mods and super users to award reputation points",
                 helpText: "Optional. Mods can always award points using the regular command.",
                 defaultValue: "!modthanks",
             },
@@ -92,7 +92,7 @@ export const appSettings: SettingsFormField[] = [
                 name: SettingName.SuperUsers,
                 type: "string",
                 label: "A list of trusted users other than mods who can award points",
-                helpText: "Optional. Enter a comma-separated list of users who can award points in addition to OP",
+                helpText: "Optional. Enter a comma-separated list of users who can award points in addition to mods using the mod command",
             },
             {
                 name: SettingName.UsersWhoCannotBeAwardedPoints,
