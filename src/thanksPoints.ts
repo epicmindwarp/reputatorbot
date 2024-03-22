@@ -107,6 +107,7 @@ export async function handleThanksEvent (event: CommentSubmit | CommentUpdate, c
         if (notifyOnError) {
             let message = settings[SettingName.NotifyOnErrorTemplate] as string ?? TemplateDefaults.NotifyOnErrorTemplate;
             message = replaceAll(message, "{{authorname}}", markdownEscape(event.author.name));
+            message = replaceAll(message, "{{permalink}}", parentComment.permalink);
             await replyToUser(context, notifyOnError[0], event.author.name, message, event.comment.id);
         }
         return;
@@ -220,6 +221,7 @@ export async function handleThanksEvent (event: CommentSubmit | CommentUpdate, c
         let message = settings[SettingName.NotifyOnSuccessTemplate] as string ?? TemplateDefaults.NotifyOnSuccessTemplate;
         message = replaceAll(message, "{{authorname}}", markdownEscape(event.author.name));
         message = replaceAll(message, "{{awardeeusername}}", markdownEscape(parentComment.authorName));
+        message = replaceAll(message, "{{permalink}}", parentComment.permalink);
         await replyToUser(context, notifyOnSuccess[0], event.author.name, message, event.comment.id);
     }
 }

@@ -148,7 +148,7 @@ export const appSettings: SettingsFormField[] = [
                 name: SettingName.NotifyOnErrorTemplate,
                 type: "paragraph",
                 label: "Template of message sent when a user tries to award themselves a point",
-                helpText: "Placeholder supported: {{authorname}}",
+                helpText: "Placeholder supported: {{authorname}}, {{permalink}}",
                 defaultValue: TemplateDefaults.NotifyOnErrorTemplate,
             },
             {
@@ -163,7 +163,7 @@ export const appSettings: SettingsFormField[] = [
                 name: SettingName.NotifyOnSuccessTemplate,
                 type: "paragraph",
                 label: "Template of message sent when a user successfully awards a point",
-                helpText: "Placeholders supported: {{authorname}}, {{awardeeusername}}",
+                helpText: "Placeholders supported: {{authorname}}, {{awardeeusername}}, {{permalink}}",
                 defaultValue: TemplateDefaults.NotifyOnSuccessTemplate,
             },
         ],
