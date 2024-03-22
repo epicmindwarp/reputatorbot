@@ -24,3 +24,4 @@ Changes in this version:
 
 * You can now use the placeholder {{permalink}} in replies when you award a point or try and self-award.
 * Super users must now use the mod command, not the command that the OP would use. This allows super users to remind people how to award points without accidentally awarding one themselves.
+* You can now set a points threshold for users to be automatically considered "trusted".

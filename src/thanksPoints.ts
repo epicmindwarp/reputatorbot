@@ -1,4 +1,4 @@
-import {TriggerContext} from "@devvit/public-api";
+import {TriggerContext, User} from "@devvit/public-api";
 import {CommentSubmit, CommentUpdate} from "@devvit/protos";
 import {ThingPrefix, getSubredditName, isModerator, replaceAll} from "./utility.js";
 import {addWeeks} from "date-fns";
@@ -31,6 +31,38 @@ async function replyToUser (context: TriggerContext, replyMode: string, toUserNa
             newComment.distinguish(),
             newComment.lock(),
         ]);
+    }
+}
+
+async function getCurrentScore (user: User, context: TriggerContext): Promise<number> {
+    const subredditName = await getSubredditName(context);
+    const userFlair = await user.getUserFlairBySubreddit(subredditName);
+
+    if (!userFlair || !userFlair.flairText || userFlair.flairText === "-") {
+        return 0;
+    } else {
+        return parseInt(userFlair.flairText);
+    }
+}
+
+async function getUserIsSuperuser (username: string, context: TriggerContext): Promise<boolean> {
+    const settings = await context.settings.getAll();
+
+    const superUserSetting = settings[SettingName.SuperUsers] as string ?? "";
+    const superUsers = superUserSetting.split(",").map(user => user.trim().toLowerCase());
+
+    if (superUsers.includes(username.toLowerCase())) {
+        return true;
+    }
+
+    const autoSuperuserThreshold = settings[SettingName.AutoSuperuserThreshold] as number ?? 0;
+
+    if (autoSuperuserThreshold) {
+        const user = await context.reddit.getUserByUsername(username);
+        const userScore = await getCurrentScore(user, context);
+        return userScore >= autoSuperuserThreshold;
+    } else {
+        return false;
     }
 }
 
@@ -72,9 +104,7 @@ export async function handleThanksEvent (event: CommentSubmit | CommentUpdate, c
             return;
         }
     } else if (modCommand && event.comment.body.toLowerCase().includes(modCommand.toLowerCase())) {
-        const superUserSetting = settings[SettingName.SuperUsers] as string ?? "";
-        const superUsers = superUserSetting.split(",").map(user => user.trim().toLowerCase());
-        const userIsSuperuser = superUsers.includes(event.author.name.toLowerCase());
+        const userIsSuperuser = await getUserIsSuperuser(event.author.name, context);
 
         if (!isMod && !userIsSuperuser) {
             console.log(`${event.comment.id}: mod points attempt by ${event.author.name} who is neither a mod nor a superuser`);
@@ -126,22 +156,11 @@ export async function handleThanksEvent (event: CommentSubmit | CommentUpdate, c
         return;
     }
 
-    let newScore: number | undefined;
-
     const parentCommentUser = await parentComment.getAuthor();
-    const userFlair = await parentCommentUser.getUserFlairBySubreddit(parentComment.subredditName);
+    const currentScore = await getCurrentScore(parentCommentUser, context);
 
-    let currentScore = 0;
-    if (!userFlair || !userFlair.flairText || userFlair.flairText === "-") {
-        newScore = 1;
-    } else {
-        currentScore = parseInt(userFlair.flairText);
-        if (isNaN(currentScore)) {
-            console.log(`${event.comment.id}: Existing flair for ${parentCommentUser.username} isn't a number. Can't award points.`);
-            newScore = 1;
-        } else {
-            newScore = currentScore + 1;
-        }
+    if (isNaN(currentScore)) {
+        console.log(`${event.comment.id}: Existing flair for ${parentCommentUser.username} isn't a number. Can't award points.`);
     }
 
     const existingFlairOverwriteHandling = settings[SettingName.ExistingFlairHandling] as string[] | undefined;
@@ -149,6 +168,8 @@ export async function handleThanksEvent (event: CommentSubmit | CommentUpdate, c
     const shouldSetUserFlair = !isNaN(currentScore) || existingFlairOverwriteHandling && existingFlairOverwriteHandling[0] === ExistingFlairOverwriteHandling.OverwriteAll;
 
     if (shouldSetUserFlair) {
+        const newScore = currentScore + 1;
+
         console.log(`${event.comment.id}: Setting points flair for ${parentCommentUser.username}. New score: ${newScore}`);
 
         let cssClass = settings[SettingName.CSSClass] as string | undefined;
@@ -173,6 +194,23 @@ export async function handleThanksEvent (event: CommentSubmit | CommentUpdate, c
             flairTemplateId: flairTemplate,
             text: newScore.toString(),
         });
+
+        // Store the user's new score
+        await context.redis.zAdd(POINTS_STORE_KEY, {member: parentComment.authorName, score: newScore});
+
+        // Check to see if user has reached the superuser threshold.
+        const autoSuperuserThreshold = settings[SettingName.AutoSuperuserThreshold] as number ?? 0;
+        const notifyOnAutoSuperuser = settings[SettingName.NotifyOnAutoSuperuser] as string[] | undefined;
+        if (autoSuperuserThreshold && modCommand && newScore === autoSuperuserThreshold && notifyOnAutoSuperuser) {
+            console.log(`${event.comment.id}: ${parentCommentUser.username} has reached the auto superuser threshold. Notifying.`);
+            let message = settings[SettingName.NotifyOnAutoSuperuserTemplate] as string ?? TemplateDefaults.NotifyOnSuperuserTemplate;
+            message = replaceAll(message, "{{authorname}}", parentCommentUser.username);
+            message = replaceAll(message, "{{permalink}}", parentComment.permalink);
+            message = replaceAll(message, "{{threshold}}", autoSuperuserThreshold.toString());
+            message = replaceAll(message, "{{pointscommand}}", modCommand);
+
+            await replyToUser(context, notifyOnAutoSuperuser[0], parentCommentUser.username, message, parentComment.id);
+        }
     }
 
     const shouldSetPostFlair = settings[SettingName.SetPostFlairOnThanks] as boolean ?? false;
@@ -207,9 +245,6 @@ export async function handleThanksEvent (event: CommentSubmit | CommentUpdate, c
 
     const now = new Date();
     await context.redis.set(redisKey, now.getTime().toString(), {expiration: addWeeks(now, 1)});
-
-    // Store the user's new score
-    await context.redis.zAdd(POINTS_STORE_KEY, {member: parentComment.authorName, score: newScore});
 
     const notifyOnSuccess = settings[SettingName.NotifyOnSuccess] as string[] | undefined;
     if (notifyOnSuccess) {

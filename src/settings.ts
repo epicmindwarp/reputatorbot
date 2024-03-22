@@ -5,6 +5,9 @@ export enum SettingName {
     ModThanksCommand = "modThanksCommand",
     AnyoneCanAwardPoints = "anyoneCanAwardPoints",
     SuperUsers = "superUsers",
+    AutoSuperuserThreshold = "autoSuperuserThreshold",
+    NotifyOnAutoSuperuser = "notifyOnAutoSuperuser",
+    NotifyOnAutoSuperuserTemplate = "notifyOnAutoSuperuserTemplate",
     UsersWhoCannotBeAwardedPoints = "excludedUsers",
     UsersWhoCannotAwardPoints = "usersWhoCantAwardPoints",
     ExistingFlairHandling = "existingFlairHandling",
@@ -49,6 +52,7 @@ export enum LeaderboardMode {
 export enum TemplateDefaults {
     NotifyOnErrorTemplate = "Hello {{authorname}},\n\nYou cannot award a point to yourself.\n\nPlease contact the mods if you have any questions.\n\n---\n\n^(I am a bot)",
     NotifyOnSuccessTemplate = "You have awarded 1 point to {{awardeeusername}}.\n\n---\n\n^(I am a bot - please contact the mods with any questions)",
+    NotifyOnSuperuserTemplate = "Hello {{authorname}},\n\nNow that you have reached {{threshold}} points you can now award points yourself, even if you're not the OP. Please use the command \"{{pointscommand}}\" if you'd like to do this.\n\n---\n\n^(I am a bot - please contact the mods with any questions)",
 }
 
 function isFlairTemplateValid (event: SettingsFormFieldValidatorEvent<string>): void | string {
@@ -77,8 +81,8 @@ export const appSettings: SettingsFormField[] = [
             {
                 name: SettingName.ModThanksCommand,
                 type: "string",
-                label: "Alternate command for mods and super users to award reputation points",
-                helpText: "Optional. Mods can always award points using the regular command.",
+                label: "Alternate command for mods and trusted users to award reputation points",
+                helpText: "Optional.",
                 defaultValue: "!modthanks",
             },
             {
@@ -93,6 +97,27 @@ export const appSettings: SettingsFormField[] = [
                 type: "string",
                 label: "A list of trusted users other than mods who can award points",
                 helpText: "Optional. Enter a comma-separated list of users who can award points in addition to mods using the mod command",
+            },
+            {
+                name: SettingName.AutoSuperuserThreshold,
+                type: "number",
+                label: "Treat users with this many points as automatically a trusted user",
+                helpText: "If zero, only explicitly named users above will be treated as trusted users",
+            },
+            {
+                name: SettingName.NotifyOnAutoSuperuser,
+                type: "select",
+                label: "Notify users who reach the auto trusted user threshold",
+                options: replyOptionChoices,
+                multiSelect: false,
+                defaultValue: [ReplyOptions.NoReply],
+            },
+            {
+                name: SettingName.NotifyOnAutoSuperuserTemplate,
+                type: "paragraph",
+                label: "Template of message sent when a user reaches the trusted user threshold",
+                helpText: "Placeholder supported: {{authorname}}, {{permalink}}, {{threshold}}, {{pointscommand}}",
+                defaultValue: TemplateDefaults.NotifyOnSuperuserTemplate,
             },
             {
                 name: SettingName.UsersWhoCannotBeAwardedPoints,
