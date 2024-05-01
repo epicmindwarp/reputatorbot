@@ -24,6 +24,7 @@ export enum SettingName {
     SetPostFlairTemplate = "setPostFlairOnThanksTemplate",
     LeaderboardMode = "leaderboardMode",
     LeaderboardWikiPage = "leaderboardWikiPage",
+    PostFlairTextToIgnore = "postFlairTextToIgnore"
 }
 
 export enum ExistingFlairOverwriteHandling {
@@ -138,6 +139,11 @@ export const appSettings: SettingsFormField[] = [
                 type: "string",
                 label: "Users who are not permitted to award points",
                 helpText: "Optional. Enter a comma-separated list of users who are not able to award points",
+            },
+            {
+                name: SettingName.PostFlairTextToIgnore,
+                type: "string",
+                label: "Optional. A list of post flairs (comma separated) for posts where points cannot be awarded",
             },
         ],
     },

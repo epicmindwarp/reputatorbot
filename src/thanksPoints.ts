@@ -1,9 +1,10 @@
 import {TriggerContext, User} from "@devvit/public-api";
 import {CommentSubmit, CommentUpdate} from "@devvit/protos";
 import {ThingPrefix, getSubredditName, isModerator, replaceAll} from "./utility.js";
-import {addWeeks} from "date-fns";
+import {addDays, addWeeks} from "date-fns";
 import {ExistingFlairOverwriteHandling, ReplyOptions, TemplateDefaults, SettingName} from "./settings.js";
 import markdownEscape from "markdown-escape";
+import {CLEANUP_LOG_KEY} from "./cleanupTasks.js";
 
 export const POINTS_STORE_KEY = "thanksPointsStore";
 
@@ -116,6 +117,16 @@ export async function handleThanksEvent (event: CommentSubmit | CommentUpdate, c
 
     console.log(`${event.comment.id}: Comment contains a reputation points command.`);
 
+    const postFlairTextToIgnoreSetting = settings[SettingName.PostFlairTextToIgnore] as string ?? "";
+    if (postFlairTextToIgnoreSetting && event.post.linkFlair) {
+        const postFlairTextToIgnore = postFlairTextToIgnoreSetting.split(",").map(flair => flair.trim().toLowerCase());
+        const postFlair = event.post.linkFlair.text.toLowerCase();
+        if (postFlairTextToIgnore.includes(postFlair)) {
+            console.log(`${event.comment.id}: Cannot award points to post with: '${postFlair}' flair`);
+            return;
+        }
+    }
+
     const isMod = await isModerator(context, event.subreddit.name, event.author.name);
 
     if (userCommand && event.comment.body.toLowerCase().includes(userCommand.toLowerCase()) && event.author.id !== event.post.authorId) {
@@ -184,6 +195,15 @@ export async function handleThanksEvent (event: CommentSubmit | CommentUpdate, c
     console.log(`${event.comment.id}: New score for ${parentComment.authorName} is ${newScore}`);
     // Store the user's new score
     await context.redis.zAdd(POINTS_STORE_KEY, {member: parentComment.authorName, score: newScore});
+    // Queue user for cleanup checks in 24 hours, overwriting existing value.
+    await context.redis.zAdd(CLEANUP_LOG_KEY, {member: parentComment.authorName, score: addDays(new Date(), 1).getTime()});
+
+    // Queue a leaderboard update.
+    await context.scheduler.runJob({
+        name: "updateLeaderboard",
+        runAt: new Date(),
+        data: {reason: `Awarded a point to ${parentComment.authorName}`},
+    });
 
     // Check to see if user has reached the superuser threshold.
     const autoSuperuserThreshold = settings[SettingName.AutoSuperuserThreshold] as number ?? 0;
