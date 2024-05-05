@@ -24,7 +24,8 @@ export enum SettingName {
     SetPostFlairTemplate = "setPostFlairOnThanksTemplate",
     LeaderboardMode = "leaderboardMode",
     LeaderboardWikiPage = "leaderboardWikiPage",
-    PostFlairTextToIgnore = "postFlairTextToIgnore"
+    PostFlairTextToIgnore = "postFlairTextToIgnore",
+    NewScoreFromFlairOnly = "newScoreFromFlairOnly"
 }
 
 export enum ExistingFlairOverwriteHandling {
@@ -209,6 +210,12 @@ export const appSettings: SettingsFormField[] = [
                 helpText: "Placeholders supported: {{authorname}}, {{awardeeusername}}, {{permalink}}, {{score}}",
                 defaultValue: TemplateDefaults.NotifyOnSuccessTemplate,
             },
+            {
+                name: SettingName.NewScoreFromFlairOnly,
+                type: "boolean",
+                label: "Only use user flair to determine the new score (no database fallback)",
+                defaultvalue: false
+            }
         ],
     },
     {

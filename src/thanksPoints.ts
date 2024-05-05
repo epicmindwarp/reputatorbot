@@ -42,13 +42,21 @@ interface ScoreResult {
 }
 
 async function getCurrentScore (user: User, context: TriggerContext): Promise<ScoreResult> {
+    const settings = await context.settings.getAll();
+    const newScoreFromFlairOnly = settings[SettingName.NewScoreFromFlairOnly] as boolean | undefined;
+
     const subredditName = await getSubredditName(context);
     const userFlair = await user.getUserFlairBySubreddit(subredditName);
 
     let scoreFromRedis: number;
-    try {
-        scoreFromRedis = await context.redis.zScore(POINTS_STORE_KEY, user.username);
-    } catch {
+    if (!newScoreFromFlairOnly) {
+        try {
+            scoreFromRedis = await context.redis.zScore(POINTS_STORE_KEY, user.username);
+        } catch {
+            scoreFromRedis = 0;
+        }
+    }
+    else {
         scoreFromRedis = 0;
     }
 
@@ -65,6 +73,7 @@ async function getCurrentScore (user: User, context: TriggerContext): Promise<Sc
         currentScore: !flairScoreIsNaN && scoreFromFlair > scoreFromRedis ? scoreFromFlair : scoreFromRedis,
         flairScoreIsNaN,
     };
+
 }
 
 async function getUserIsSuperuser (username: string, context: TriggerContext): Promise<boolean> {
